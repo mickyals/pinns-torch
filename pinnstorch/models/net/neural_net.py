@@ -1,8 +1,9 @@
-from typing import Dict, List
+from typing import Dict, List, Callable
 
 import numpy as np
 import torch
 from torch import nn
+from .activations import SineActivation, GaussianActivation, WireActivation, HoscActivation, SincActivation
 
 
 class FCN(nn.Module):
@@ -12,7 +13,7 @@ class FCN(nn.Module):
     """
     output_names: List[str]
     
-    def __init__(self, layers, lb, ub, output_names, discrete: bool = False) -> None:
+    def __init__(self, layers, lb, ub, output_names, activation: Callable[[], nn.Module]  = nn.Tanh,discrete: bool = False) -> None:
         """Initialize a `FCN` module.
 
         :param layers: The list indicating number of neurons in each layer.
@@ -23,11 +24,13 @@ class FCN(nn.Module):
         """
         super().__init__()
 
+        self.activation = activation
         self.model = self.initalize_net(layers)
         self.register_buffer("lb", torch.tensor(lb, dtype=torch.float32, requires_grad=False))
         self.register_buffer("ub", torch.tensor(ub, dtype=torch.float32, requires_grad=False))
         self.output_names = output_names
         self.discrete = discrete
+
 
     def initalize_net(self, layers: List):
         """Initialize the layers of the neural network.
@@ -43,13 +46,13 @@ class FCN(nn.Module):
         initializer(input_layer.weight)
 
         net.add_module("input", input_layer)
-        net.add_module("activation_1", nn.Tanh())
+        net.add_module("activation_1", self.activation()) ### add multiple activations option here.
 
         for i in range(1, len(layers) - 2):
             hidden_layer = nn.Linear(layers[i], layers[i + 1])
             initializer(hidden_layer.weight)
             net.add_module(f"hidden_{i+1}", hidden_layer)
-            net.add_module(f"activation_{i+1}", nn.Tanh())
+            net.add_module(f"activation_{i+1}", self.activation()) ### add multiple activations option here.
 
         output_layer = nn.Linear(layers[-2], layers[-1])
         initializer(output_layer.weight)
