@@ -219,7 +219,7 @@ class GaussianFinerActivation(nn.Module):
         sigma (float): The standard deviation parameter of the Gaussian function.
         omega (float): The frequency parameter of the Gaussian function.
     """
-    def __init__(self, sigma=10, omega=30):
+    def __init__(self, sigma=10, omega=30, **kwargs):
         """
         Initializes the GaussianFiner module.
 

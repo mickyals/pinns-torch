@@ -198,7 +198,7 @@ class XavierUniformFinerInit:
         gain (float): The gain parameter of the Xavier initialization.
         k (float): The range of the uniform distribution for the biases.
     """
-    def __init__(self, gain=1.0, k=1):
+    def __init__(self, gain=1.0, k=1, **kwargs):
         """
         Initializes the XavierUniformFinerInit class.
 
@@ -298,7 +298,7 @@ class XavierUniformInit:
     Attributes:
         gain (float): The gain parameter of the Xavier initialization.
     """
-    def __init__(self, gain=1.0):
+    def __init__(self, gain=1.0, **kwargs):
         """
         Initializes the XavierUniformInit class with the gain parameter.
 
@@ -322,7 +322,7 @@ class XavierNormalInit:
     Attributes:
         gain (float): The gain parameter of the Xavier initialization.
     """
-    def __init__(self, gain=1.0):
+    def __init__(self, gain=1.0, **kwargs):
         """
         Initializes the XavierNormalInit class with the gain parameter.
 
@@ -362,7 +362,7 @@ class NormalInit:
         mean (float): The mean of the normal distribution.
         std (float): The standard deviation of the normal distribution.
     """
-    def __init__(self, mean=0.0, std=0.1):
+    def __init__(self, mean=0.0, std=0.1, **kwargs):
         """
         Initializes the NormalInit class with the mean and standard deviation of
         the normal distribution.
@@ -396,7 +396,7 @@ class NormalInit:
 
 @register_initializer("UNIFORM", desc="Uniform initialization")
 class UniformInit:
-    def __init__(self, a=-0.1, b=0.1):
+    def __init__(self, a=-0.1, b=0.1, **kwargs):
         """
         Initializes the UniformInit class with the lower and upper bounds of the
         uniform distribution.
@@ -437,7 +437,7 @@ class UniformInit:
 
 @register_initializer("IDENTITY", desc="Identity initialization")
 class IdentityInit:
-    def __call__(self, linear_layer):
+    def __call__(self, linear_layer, **kwargs):
         """
         Initialize the weights of the `linear_layer` as an identity matrix.
 
@@ -464,7 +464,7 @@ class OrthogonalInit:
         gain (float): The gain factor to be applied to the orthogonal matrix.
             Defaults to 1.0.
     """
-    def __init__(self, gain=1.0):
+    def __init__(self, gain=1.0, **kwargs):
         """
         Initializes the OrthogonalInit object.
 
