@@ -1,8 +1,8 @@
 # Base layer types: Linear, FourierLayer, SIRENLayer
 import torch
 import torch.nn as nn
-from ..core.initializations import get_initializer
-from ..core.activations import get_activation
+from .initializations import get_initializer
+from .activations import get_activation
 
 LAYERS = {}
 
@@ -89,7 +89,8 @@ class BaseLayer(nn.Module):
         """
         # If the layer is the last layer, just apply the linear layer
         if self.is_last:
-            return self.linear(x)
+            y = self.linear(x)
+            return y.real if torch.is_complex(y) else y
         # Otherwise, apply the linear layer and the activation function
         return self.activation(self.linear(x))
 

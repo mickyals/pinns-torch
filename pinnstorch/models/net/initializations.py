@@ -81,7 +81,7 @@ def get_initializer(name, **kwargs):
 
 @register_initializer("SIREN", desc="SIREN-specific initialization")
 class SirenInit:
-    def __init__(self, in_features, is_first=False, omega=30):
+    def __init__(self, in_features, is_first=True, omega=30):
         """
         Initializes the SirenInit class.
 
@@ -247,7 +247,7 @@ class XavierNormFinerInit:
         gain (float): The gain parameter of the Xavier initialization.
         k (float): The range of the uniform distribution for the biases.
     """
-    def __init__(self, gain=1.0, k=1):
+    def __init__(self, gain=1.0, k=1, **kwargs):
         """
         Initializes the XavierNormFinerInit class.
 
@@ -259,6 +259,7 @@ class XavierNormFinerInit:
         """
         self.gain = gain
         self.k = k
+        self.kwargs = kwargs
 
     def __call__(self, linear_layer):
         """

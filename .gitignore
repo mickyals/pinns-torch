@@ -167,3 +167,6 @@ outputs
 misc
 /misc
 /misc/
+
+lightning_logs
+/lightning_logs/

@@ -3,7 +3,9 @@ from typing import Dict, List, Callable
 import numpy as np
 import torch
 from torch import nn
-from .activations import SineActivation, GaussianActivation, WireActivation, HoscActivation, SincActivation
+from .activations import get_activation
+from .initializations import get_initializer
+from .layers import LAYERS
 
 
 class FCN(nn.Module):
@@ -12,51 +14,107 @@ class FCN(nn.Module):
     In this model, lower and upper bound will be used for normalization of input data
     """
     output_names: List[str]
-    
-    def __init__(self, layers, lb, ub, output_names, activation: Callable[[], nn.Module]  = nn.Tanh,discrete: bool = False) -> None:
-        """Initialize a `FCN` module.
 
-        :param layers: The list indicating number of neurons in each layer.
-        :param lb: Lower bound for the inputs.
-        :param ub: Upper bound for the inputs.
-        :param output_names: Names of outputs of net.
-        :param discrete: If the problem is discrete or not.
-        """
+    def __init__(self, layers, lb, ub, output_names,
+                 activation="TANH", activation_kwargs=None,
+                 initializer="XAVIER", initializer_kwargs=None,
+                 layer_type="BASE", layer_kwargs=None,
+                 discrete=False):
         super().__init__()
 
-        self.activation = activation
-        self.model = self.initalize_net(layers)
+        self.activation_name = activation
+        self.activation_kwargs = activation_kwargs or {}
+        self.initializer_name = initializer
+        self.initializer_kwargs = initializer_kwargs or {}
+        self.layer_type = layer_type.upper()
+        self.layer_kwargs = layer_kwargs or {}
+
+        self.model = self.initialize_net(layers)
+
         self.register_buffer("lb", torch.tensor(lb, dtype=torch.float32, requires_grad=False))
         self.register_buffer("ub", torch.tensor(ub, dtype=torch.float32, requires_grad=False))
         self.output_names = output_names
         self.discrete = discrete
 
 
-    def initalize_net(self, layers: List):
+    def initialize_net(self, layers: List):
         """Initialize the layers of the neural network.
 
         :param layers: The list indicating number of neurons in each layer.
         :return: The initialized neural network.
         """
 
-        initializer = nn.init.xavier_uniform_
+        if self.layer_type not in LAYERS:
+            raise ValueError(f"Unknown layer type {self.layer_type}. "
+                             f"Available: {list(LAYERS.keys())}")
+        LayerClass = LAYERS[self.layer_type]["cls"]
         net = nn.Sequential()
 
-        input_layer = nn.Linear(layers[0], layers[1])
-        initializer(input_layer.weight)
+        # 1. First layer
+        first_layer = LayerClass(
+            in_features=layers[0],
+            out_features=layers[1],
+            initializer=self.initializer_name,
+            activation=self.activation_name,
+            is_last=False,
+            initializer_kwargs={**self.initializer_kwargs,
+                                "in_features": layers[0],
+                                "is_first": True},
+            activation_kwargs=self.activation_kwargs,
+            **self.layer_kwargs
+        )
+        net.add_module("layer_0", first_layer)
 
-        net.add_module("input", input_layer)
-        net.add_module("activation_1", self.activation()) ### add multiple activations option here.
-
+        # 2. Hidden layers
         for i in range(1, len(layers) - 2):
-            hidden_layer = nn.Linear(layers[i], layers[i + 1])
-            initializer(hidden_layer.weight)
-            net.add_module(f"hidden_{i+1}", hidden_layer)
-            net.add_module(f"activation_{i+1}", self.activation()) ### add multiple activations option here.
+            hidden_layer = LayerClass(
+                in_features=layers[i],
+                out_features=layers[i + 1],
+                initializer=self.initializer_name,
+                activation=self.activation_name,
+                is_last=False,
+                initializer_kwargs={**self.initializer_kwargs,
+                                    "in_features": layers[i],
+                                    "is_first": False},
+                activation_kwargs=self.activation_kwargs,
+                **self.layer_kwargs
+            )
+            net.add_module(f"layer_{i}", hidden_layer)
 
-        output_layer = nn.Linear(layers[-2], layers[-1])
-        initializer(output_layer.weight)
-        net.add_module("output", output_layer)
+        # 3. Last layer (no activation, ensure real output)
+        last_layer = LayerClass(
+            in_features=layers[-2],
+            out_features=layers[-1],
+            initializer=self.initializer_name,
+            activation=self.activation_name,
+            is_last=True,
+            initializer_kwargs={**self.initializer_kwargs,
+                                "in_features": layers[-2],
+                                "is_first": False},
+            activation_kwargs=self.activation_kwargs,
+            **self.layer_kwargs
+        )
+        net.add_module(f"layer_{len(layers) - 2}", last_layer)
+
+
+        # initializer = nn.init.xavier_uniform_
+        # net = nn.Sequential()
+        #
+        # input_layer = nn.Linear(layers[0], layers[1])
+        # initializer(input_layer.weight)
+        #
+        # net.add_module("input", input_layer)
+        # net.add_module("activation_1", self.activation()) ### add multiple activations option here.
+        #
+        # for i in range(1, len(layers) - 2):
+        #     hidden_layer = nn.Linear(layers[i], layers[i + 1])
+        #     initializer(hidden_layer.weight)
+        #     net.add_module(f"hidden_{i+1}", hidden_layer)
+        #     net.add_module(f"activation_{i+1}", self.activation()) ### add multiple activations option here.
+        #
+        # output_layer = nn.Linear(layers[-2], layers[-1])
+        # initializer(output_layer.weight)
+        # net.add_module("output", output_layer)
         return net
 
     def forward(self, spatial: List[torch.Tensor], time: torch.Tensor) -> Dict[str, torch.Tensor]:
