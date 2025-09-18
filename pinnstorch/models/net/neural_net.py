@@ -36,85 +36,45 @@ class FCN(nn.Module):
         self.output_names = output_names
         self.discrete = discrete
 
-
-    def initialize_net(self, layers: List):
-        """Initialize the layers of the neural network.
+    def initialize_net(self, layers: list):
+        """
+        Initialize the layers of the neural network with proper dtypes for complex activations.
 
         :param layers: The list indicating number of neurons in each layer.
-        :return: The initialized neural network.
+        :return: The initialized neural network (nn.Sequential).
         """
-
         if self.layer_type not in LAYERS:
-            raise ValueError(f"Unknown layer type {self.layer_type}. "
-                             f"Available: {list(LAYERS.keys())}")
+            raise ValueError(f"Unknown layer type {self.layer_type}. Available: {list(LAYERS.keys())}")
+
         LayerClass = LAYERS[self.layer_type]["cls"]
         net = nn.Sequential()
 
-        # 1. First layer
-        first_layer = LayerClass(
-            in_features=layers[0],
-            out_features=layers[1],
-            initializer=self.initializer_name,
-            activation=self.activation_name,
-            is_last=False,
-            initializer_kwargs={**self.initializer_kwargs,
-                                "in_features": layers[0],
-                                "is_first": True},
-            activation_kwargs=self.activation_kwargs,
-            **self.layer_kwargs
-        )
-        net.add_module("layer_0", first_layer)
+        for i in range(len(layers) - 1):
+            is_first = (i == 0)
+            is_last = (i == len(layers) - 2)
 
-        # 2. Hidden layers
-        for i in range(1, len(layers) - 2):
-            hidden_layer = LayerClass(
+            # Determine dtype
+            if is_first:
+                layer_dtype = torch.float  # first layer input is real
+            elif is_last:
+                layer_dtype = torch.float  # final output forced to real
+            else:
+                layer_dtype = torch.cfloat if self.activation_name in ["WIRE", "WIRE_FINER"] else torch.float
+
+            layer = LayerClass(
                 in_features=layers[i],
                 out_features=layers[i + 1],
                 initializer=self.initializer_name,
                 activation=self.activation_name,
-                is_last=False,
-                initializer_kwargs={**self.initializer_kwargs,
-                                    "in_features": layers[i],
-                                    "is_first": False},
+                is_last=is_last,
+                is_first=is_first,
+                initializer_kwargs={**self.initializer_kwargs, "in_features": layers[i], "is_first": is_first},
                 activation_kwargs=self.activation_kwargs,
+                dtype=layer_dtype,
                 **self.layer_kwargs
             )
-            net.add_module(f"layer_{i}", hidden_layer)
+            net.add_module(f"layer_{i}", layer)
 
-        # 3. Last layer (no activation, ensure real output)
-        last_layer = LayerClass(
-            in_features=layers[-2],
-            out_features=layers[-1],
-            initializer=self.initializer_name,
-            activation=self.activation_name,
-            is_last=True,
-            initializer_kwargs={**self.initializer_kwargs,
-                                "in_features": layers[-2],
-                                "is_first": False},
-            activation_kwargs=self.activation_kwargs,
-            **self.layer_kwargs
-        )
-        net.add_module(f"layer_{len(layers) - 2}", last_layer)
-
-
-        # initializer = nn.init.xavier_uniform_
-        # net = nn.Sequential()
-        #
-        # input_layer = nn.Linear(layers[0], layers[1])
-        # initializer(input_layer.weight)
-        #
-        # net.add_module("input", input_layer)
-        # net.add_module("activation_1", self.activation()) ### add multiple activations option here.
-        #
-        # for i in range(1, len(layers) - 2):
-        #     hidden_layer = nn.Linear(layers[i], layers[i + 1])
-        #     initializer(hidden_layer.weight)
-        #     net.add_module(f"hidden_{i+1}", hidden_layer)
-        #     net.add_module(f"activation_{i+1}", self.activation()) ### add multiple activations option here.
-        #
-        # output_layer = nn.Linear(layers[-2], layers[-1])
-        # initializer(output_layer.weight)
-        # net.add_module("output", output_layer)
         return net
 
     def forward(self, spatial: List[torch.Tensor], time: torch.Tensor) -> Dict[str, torch.Tensor]:

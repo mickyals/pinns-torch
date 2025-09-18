@@ -57,7 +57,8 @@ class BaseLayer(nn.Module):
         initializer_kwargs (dict, optional): Keyword arguments for the initializer. Defaults to None.
         activation_kwargs (dict, optional): Keyword arguments for the activation function. Defaults to None.
     """
-    def __init__(self, in_features, out_features, initializer, activation, is_last=False, initializer_kwargs=None, activation_kwargs=None):
+    def __init__(self, in_features, out_features, initializer, activation,
+                 is_last=False, initializer_kwargs=None, activation_kwargs=None, dtype=None, **kwargs):
         """
         Initialize the BaseLayer class.
         """
@@ -66,8 +67,11 @@ class BaseLayer(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         # Initialize the linear layer
-        self.linear = nn.Linear(in_features, out_features)
+        self.linear = nn.Linear(in_features, out_features).to(dtype=dtype) if dtype is not None else nn.Linear(
+            in_features, out_features)
+
         # Initialize the activation function
+        self.activation_name = activation
         self.activation = get_activation(activation, **(activation_kwargs if activation_kwargs is not None else {}))
         # Initialize the weight initialization method
         self.initializer = get_initializer(initializer,  **(initializer_kwargs if initializer_kwargs is not None else {}))
@@ -87,12 +91,12 @@ class BaseLayer(nn.Module):
             torch.Tensor: Output tensor after applying the linear layer
             and activation function (if it is the last layer).
         """
-        # If the layer is the last layer, just apply the linear layer
-        if self.is_last:
-            y = self.linear(x)
-            return y.real if torch.is_complex(y) else y
-        # Otherwise, apply the linear layer and the activation function
-        return self.activation(self.linear(x))
+        y = self.linear(x)
+        if not self.is_last:
+            y = self.activation(y.to(torch.cfloat) if self.activation_name in ["WIRE", "WIRE_FINER"] else y)
+        else:
+            y = y.real  # final output forced to real
+        return y
 
 
 @register_layer("RESIDUAL", "Residual block allowing for custom initializer and activation")
@@ -164,5 +168,4 @@ class ResidualBaseBlock(nn.Module):
         else:
             # Weight the main path and residual path
             return (1 - self.residual_weight) * main_path + self.residual_weight * res
-
 
